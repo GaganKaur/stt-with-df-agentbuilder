@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dialogflow Messenger Audio Input</title>
+  <link rel="stylesheet" href="https://www.gstatic.com/dialogflow-console/fast/df-messenger/prod/v1/themes/df-messenger-default.css">
+</head>
+<body>
+  <df-messenger
+    location="us-central1"
+    project-id="genai-project-sept" 
+    agent-id="700b01d6-6617-433f-8d5f-13a55267b493" 
+    language-code="en"
+    max-query-length="-1">
+    <df-messenger-chat
+      chat-title="Agent Sep 24, 2024, 12:32:34 PM"
+      enable-audio-input>
+      <df-reset-session-button
+        slot="titlebar-actions"
+        title-text="Start new session">
+      </df-reset-session-button>
+    </df-messenger-chat>
+  </df-messenger>
+
+  <style>
+    df-messenger {
+    z-index: 999;
+    position: fixed;
+    --df-messenger-font-color: #000;
+    --df-messenger-font-family: Google Sans;
+    --df-messenger-chat-background: #f3f6fc;
+    --df-messenger-message-user-background: #d3e3fd;
+    --df-messenger-message-bot-background: #fff;
+    bottom: 0;
+    right: 0;
+    top: 0;
+    width: 350;
+    
+  }
+  </style>
+
+<script src="https://www.gstatic.com/dialogflow-console/fast/df-messenger/prod/v1/df-messenger.js"></script>
+<script>
+  // Function to get the Agent Builder endpoint
+  function getAgentBuilderEndpoint(projectId, environment) {
+    return `https://${location.hostname}/api/projects/${projectId}/locations/global/agents/-/environments/${environment}/sessions/-/detectIntent`;
+  }
+
+  // Function to send the audio request to Agent Builder
+  async function sendRequestToAgentBuilder(audioBase64) {
+    const requestPayload = {
+      queryInput: {
+        audioConfig: {
+          audioEncoding: 'AUDIO_ENCODING_LINEAR_16',
+          sampleRateHertz: 16000,
+          languageCode: 'en-US'
+        }
+      },
+      inputAudio: audioBase64 
+    };
+
+    const endpoint = getAgentBuilderEndpoint("genai-project-sept", "draft");
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          // Add your authorization header here if needed
+        },
+        body: JSON.stringify(requestPayload)
+      });
+
+      const data = await response.json();
+      console.log('Agent Builder response:', data);
+
+      // Handle the response from Agent Builder, e.g., display the bot reply
+    } catch (error) {
+      console.error('Error sending request to Agent Builder:', error);
+    }
+  }
+
+
+  // Custom event to trigger when audio is recorded
+  const audioInputRecorded = new Event('df-audio-input-recorded');
+
+  async function simulateAudioRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const audioChunks = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const audioBase64 = reader.result.split(',')[1];
+          audioInputRecorded.detail = { data: audioBase64 };
+          window.dispatchEvent(audioInputRecorded);
+        };
+        reader.readAsDataURL(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setTimeout(() => {
+        mediaRecorder.stop();
+      }, 5000); // Record for 5 seconds
+
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+    }
+  }
+
+  // Event listener for the custom 'df-audio-input-recorded' event
+  window.addEventListener('df-audio-input-recorded', (event) => {
+    try {
+      console.log("Audio input recorded (base64):", event.detail.data);
+      sendRequestToAgentBuilder(event.detail.data); 
+    } catch (error) {
+      console.error('Error in event listener:', error);
+    }
+  });
+
+  // Function to set up the event listener on the chat element
+  function setupMicrophoneListener() {
+      const chatElement = document.querySelector('df-messenger-chat');
+      if (chatElement) { 
+        chatElement.addEventListener('df-audio-input-started', () => {
+          simulateAudioRecording();
+        });
+      } else {
+        console.error("df-messenger-chat element not found!");
+      }
+    }
+
+    // Wait for the DOM to be fully loaded before setting up the listener
+    document.addEventListener('DOMContentLoaded', () => {
+      setupMicrophoneListener(); 
+    });
+  
+
+  // Trigger recording when the microphone button is clicked
+  //const chatElement = document.querySelector('df-messenger-chat');
+  //chatElement.addEventListener('df-audio-input-started', () => {
+   // simulateAudioRecording();
+  //});
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
